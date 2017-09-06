@@ -82,6 +82,18 @@ public class ExtractEmailAttachments extends AbstractProcessor {
     public static final String ATTACHMENT_ORIGINAL_FILENAME = "email.attachment.parent.filename";
     public static final String ATTACHMENT_ORIGINAL_UUID = "email.attachment.parent.uuid";
 
+    public static final PropertyDescriptor STRICT_ADDRESSING = new PropertyDescriptor.Builder()
+            .name("STRICT_ADDRESSING")
+            .displayName("Use Strict Email Addresses")
+            .description("If true, strict adderss rules will be applied. Some mail messages may fail if they have" +
+                    " poorly constructed emails. Setting this to false will allow more mail messages through the " +
+                    "processor, and behave more like sendmail. Try setting this to false if you want poorly constructed" +
+                    " addresses to be accepted.")
+            .required(true)
+            .defaultValue("true")
+            .allowableValues("true", "false")
+            .build();
+
     public static final Relationship REL_ATTACHMENTS = new Relationship.Builder()
             .name("attachments")
             .description("Each individual attachment will be routed to the attachments relationship")
@@ -107,7 +119,7 @@ public class ExtractEmailAttachments extends AbstractProcessor {
         this.relationships = Collections.unmodifiableSet(relationships);
 
         final List<PropertyDescriptor> descriptors = new ArrayList<>();
-
+        descriptors.add(STRICT_ADDRESSING);
         this.descriptors = Collections.unmodifiableList(descriptors);
     }
 
@@ -118,6 +130,7 @@ public class ExtractEmailAttachments extends AbstractProcessor {
         if (originalFlowFile == null) {
             return;
         }
+        final boolean strict = context.getProperty(STRICT_ADDRESSING).asBoolean();
         final List<FlowFile> attachmentsList = new ArrayList<>();
         final List<FlowFile> invalidFlowFilesList = new ArrayList<>();
         final List<FlowFile> originalFlowFilesList = new ArrayList<>();
@@ -132,8 +145,8 @@ public class ExtractEmailAttachments extends AbstractProcessor {
                         MimeMessageParser parser = new MimeMessageParser(originalMessage).parse();
                         // RFC-2822 determines that a message must have a "From:" header
                         // if a message lacks the field, it is flagged as invalid
-                        if (InternetAddress.parseHeader(originalMessage.getHeader("From", ","), false) == null) {
-                            if (InternetAddress.parseHeader(originalMessage.getHeader("Sender", ","), false) == null) {
+                        if (InternetAddress.parseHeader(originalMessage.getHeader("From", ","), strict) == null) {
+                            if (InternetAddress.parseHeader(originalMessage.getHeader("Sender", ","), strict) == null) {
                                 throw new MessagingException("Message failed RFC2822 validation: No Sender");
                             }
                         }
